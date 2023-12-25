@@ -1,7 +1,7 @@
 import hashlib
 import sqlite3 as sqlite
 import string
-import random
+import secrets
 
 from settings import *
 from os.path import join as join_path
@@ -12,7 +12,7 @@ hasher = hashlib.sha1()
 
 
 def get_random_salt(length: int) -> str:
-    return "".join(random.choice(string.ascii_letters) for _ in range(length))
+    return "".join(secrets.choice(string.ascii_letters) for _ in range(length))
 
 
 def to_hash(
