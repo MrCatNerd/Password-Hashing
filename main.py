@@ -8,6 +8,7 @@ from os.path import join as join_path
 
 con = sqlite.connect(join_path("data", "users.db"))
 cur = con.cursor()
+hasher = hashlib.sha1()
 
 
 def get_random_salt(length: int) -> str:
@@ -15,27 +16,13 @@ def get_random_salt(length: int) -> str:
 
 
 def to_hash(
-    ctx: str, salt: str = None, salt_len: int = None, encoding: str = "utf-8"
+    ctx: str,
+    salt: str,
+    encoding: str = "utf-8",
 ) -> str:
+    hasher.update((ctx + salt).encode(encoding))
 
-    if salt is None:
-
-        if salt_len is None:
-            salt_len: int = 10
-        else:
-            salt_len: int = salt_len
-
-        salt: str = get_random_salt(salt_len)
-    else:
-        salt: str = salt
-
-    ctx: str = ctx
-
-    encode = encoding
-
-    final: str = bytes(f"{ctx}{salt}", encode)
-
-    hash_ctx: str = hashlib.sha1(final).hexdigest()
+    hash_ctx: str = hasher.hexdigest()
 
     return hash_ctx
 
@@ -47,34 +34,7 @@ def clear_users(are_you_sure: bool) -> None:
     con.commit()
 
 
-def to_hash_and_salt(
-    ctx: str, salt: str = None, salt_len: int = None, encoding: str = "utf-8"
-) -> tuple[str, str]:
-
-    if salt is None:
-
-        if salt_len is None:
-            salt_len: int = 10
-        else:
-            salt_len: int = salt_len
-
-        salt: str = get_random_salt(salt_len)
-    else:
-        salt: str = salt
-
-    ctx: str = ctx
-
-    encode = encoding
-
-    final: str = bytes(f"{ctx}{salt}", encode)
-
-    hash_ctx: str = hashlib.sha1(final).hexdigest()
-
-    return (hash_ctx, salt)
-
-
 def get_data(username: str) -> tuple:
-
     data = cur.execute(
         f'SELECT * FROM users WHERE name LIKE "{username}"'
     ).fetchone()  # indexes: [   0:name 1:salt 2:hashed password   ]
@@ -83,7 +43,8 @@ def get_data(username: str) -> tuple:
 
 
 def write_user(username: str, password: str) -> None:
-    password, salt = to_hash_and_salt(password, None, 100)
+    salt: str = get_random_salt(100)
+    password = to_hash(password, salt)
 
     cur.execute(
         f'INSERT INTO users VALUES("{username}","{salt}","{password}");'
@@ -92,15 +53,25 @@ def write_user(username: str, password: str) -> None:
     con.commit()
 
 
-def delete_user(username: str) -> bool:
+def delete_user(username: str) -> None:
     cur.execute(f'DELETE FROM users WHERE name LIKE "{username}"')
     con.commit()
 
 
 def try_login(username: str, password: str) -> bool:
     userdata = get_data(username)
+
+    if userdata is None:
+        return False
+
     salt = userdata[1]
 
-    hashedpassword = to_hash(password, salt, None)  # encoding is always UTF-8
+    hashedpassword = to_hash(password, salt)  # encoding is always UTF-8
 
     return hashedpassword == userdata[2]
+
+
+if __name__ == "__main__":
+    uname = input("Gimmmie da username: ")
+    password = input("Gimmie da password: ")
+    try_login(uname, password)
